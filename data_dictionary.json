@@ -1,0 +1,136 @@
+{
+    "2018": {
+        "front": {
+            "nom_surname": {
+                "type": "string / text",
+                "description": "Name and surname of the person"
+            },
+            "prenom_given_name": {
+                "type": "string / text",
+                "description": "Given name of the person"
+            },
+            "date_of_birth": {
+                "type": "date",
+                "description": "Date of birth of the person, les nombres sont en principe séparés par des points"
+            },
+            "lieu_of_birth": {
+                "type": "string / text",
+                "description": "Place of birth of the person"
+            },
+            "sex": {
+                "type": "string / text",
+                "description": "Sex of the person, en général M ou F"
+            },
+            "taille": {
+                "type": "nombre / number",
+                "description": "Taille de la personne en metres, il n'y a pas l'unité, et il ne faut pas mettre l'utnité dans le résultat, garder la valeur numerique"
+            },
+            "profession": {
+                "type": "string / text",
+                "description": "Profession de la personne"
+            }
+        },
+        "back": {
+            "pere_father": {
+                "type": "string / text",
+                "description": "Name and surname of the father"
+            },
+            "mere_mother": {
+                "type": "string / text",
+                "description": "Name and surname of the mother"
+            },
+            "sp_sm": {
+                "type": "string / text",
+                "description": "en géneral un nombre de 6chiffres"
+            },
+            "date_of_issue": {
+                "type": "date",
+                "description": "Date of issue of the document, les nombres sont en principe séparés par des points"
+            },
+            "date_of_expiration": {
+                "type": "date",
+                "description": "Date of expiration of the document, les nombres sont en principe séparés par des points"
+            },
+            "identifiant_unique": {
+                "type": "nombre / number",
+                "description": "Unique identifier of the document, en général un nombre de 17 chiffres, en général il commence par l'année de la date de délivrance"
+            },
+            "numero_de_carte": {
+                "type": "nombre / number",
+                "description": "c'est un nombre, généralement de 9 chiffres, il est souvent isolé vers la fin du document, il n'y a pas l'unité, et il ne faut pas mettre l'utnité dans le résultat, garder la valeur numerique"
+            },
+            "authorité": {
+                "type": "string / text",
+                "description": "Nom de l'autorité qui a délivré le document, en général c'est Martin MBARGA NGUELE"
+            }
+
+        }
+    },
+    "2025": {
+        "front": {
+            "numero_de_carte": {
+                "type": "nombre / number",
+                "description": "c'est un nombre, généralement de 9 chiffres, il est souvent isolé vers le début du document, il n'y a pas l'unité, et il ne faut pas mettre l'utnité dans le résultat, garder la valeur numerique"
+            },
+            "nom_surname": {
+                "type": "string / text",
+                "description": "Name and surname of the person"
+            },
+            "prenom_given_name": {
+                "type": "string / text",
+                "description": "Given name of the person"
+            },
+            "date_of_birth": {
+                "type": "date",
+                "description": "Date of birth of the person, les nombres sont en principe séparés par des points"
+            },
+            
+            "sex": {
+                "type": "string / text",
+                "description": "Sex of the person, en général M ou F"
+            },
+            "date_of_expiration": {
+                "type": "date",
+                "description": "Date of expiration of the document, les nombres sont en principe séparés par des points"
+            }
+            
+        },
+        "back": {
+            
+            "pere_father": {
+                "type": "string / text",
+                "description": "Name and surname of the father"
+            },
+            "mere_mother": {
+                "type": "string / text",
+                "description": "Name and surname of the mother"
+            },
+            "lieu_of_birth": {
+                "type": "string / text",
+                "description": "Place of birth of the person"
+            },
+            "date_of_issue": {
+                "type": "date",
+                "description": "Date of issue of the document, les nombres sont en principe séparés par des points"
+            },
+            "taille": {
+                "type": "nombre / number",
+                "description": "Taille de la personne en metres, il n'y a pas l'unité, et il ne faut pas mettre l'utnité dans le résultat, garder la valeur numerique"
+            },
+            "profession": {
+                "type": "string / text",
+                "description": "Profession de la personne"
+            },
+
+            "identifiant_unique": {
+                "type": "texte",
+                "description": "(Numero CNI / NIC NUMBER ) Unique identifier of the document, en général un nombre de 2lettres suivies de 8 chiffres"
+            },
+            "authorité": {
+                "type": "string / text",
+                "description": "Nom de l'autorité qui a délivré le document, en général c'est Martin MBARGA NGUELE"
+            }
+
+        }
+    }
+}
