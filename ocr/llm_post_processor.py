@@ -43,10 +43,10 @@ class LLMPostProcessor:
         Process the raw output from the LLM.
 
         Args:
-            output: The raw output from the LLM.
+            instructions: The instructions/prompt for the LLM.
 
         Returns:
-            Processed output as a string.
+            Tuple (raw_text, parsed_json): Raw generated text and parsed JSON (or None if parsing fails).
         """
         inputs = self.tokenizer(instructions, return_tensors="pt").to(self.device)
 
@@ -62,9 +62,17 @@ class LLMPostProcessor:
         # Résultat
         response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
         generated_text = response[len(instructions):].strip()
-        first_closure = generated_text.find("}")
-        return generated_text[:first_closure + 1]
+        
+        # Extract JSON from the generated text
         first_opening = generated_text.find("{")
+        first_closure = generated_text.find("}")
+        
         if first_closure != -1 and first_opening != -1 and first_closure > first_opening:
-            generated_text = generated_text[first_opening:first_closure + 1]
-        return json.loads(generated_text)
+            json_text = generated_text[first_opening:first_closure + 1]
+            try:
+                parsed_json = json.loads(json_text)
+                return generated_text, parsed_json
+            except json.JSONDecodeError:
+                return generated_text, None
+        
+        return generated_text, None

@@ -1,8 +1,9 @@
 import torch
 from ocr.llm_post_processor import LLMPostProcessor
+from ocr.llm_post_processor_lora import LLMPostProcessorLoRA
 from ocr.card_side import CardSide
 from ocr.card_version import CardVersion
-# from ocr.paddle_extractor import PaddleExtractor
+from ocr.paddle_extractor import PaddleExtractor
 import logging
 import time
 
@@ -11,25 +12,39 @@ logger = logging.getLogger(__name__)
 
 
 class IDCardDataExtractor:
-    def __init__(self, llm_model_path, device="cpu"):
+    def __init__(self, llm_model_path, device="cpu", lora_adapter_path=None):
         self.model_path = llm_model_path
         self.device = device
-        logger.info(
-            f"Initializing IDCardDataExtractor with model path: {self.model_path} and device: {self.device}")
+        self.lora_adapter_path = lora_adapter_path
+        
+        if lora_adapter_path:
+            logger.info(
+                f"Initializing IDCardDataExtractor with base model: {self.model_path}, LoRA adapter: {lora_adapter_path}, device: {self.device}")
+        else:
+            logger.info(
+                f"Initializing IDCardDataExtractor with model path: {self.model_path} and device: {self.device}")
 
         start_time = time.time()
         logger.info("Loading OCR with PaddleExtractor")
-        # self.paddle_extractor = PaddleExtractor()
-        self.paddle_extractor = None
+        self.paddle_extractor = PaddleExtractor()
         logger.info("PaddleExtractor loaded successfully in {} seconds".format(
             time.time() - start_time))
 
         start_time = time.time()
-        logger.info("Loading LLMPostProcessor")
-        self.llm_post_processor: LLMPostProcessor = LLMPostProcessor(
-            model_path=self.model_path)
-        logger.info("LLMPostProcessor loaded successfully in {} seconds".format(
-            time.time() - start_time))
+        if lora_adapter_path:
+            logger.info("Loading LLMPostProcessorLoRA")
+            self.llm_post_processor = LLMPostProcessorLoRA(
+                base_model_path=self.model_path,
+                adapter_path=lora_adapter_path
+            )
+            logger.info("LLMPostProcessorLoRA loaded successfully in {} seconds".format(
+                time.time() - start_time))
+        else:
+            logger.info("Loading LLMPostProcessor")
+            self.llm_post_processor = LLMPostProcessor(
+                model_path=self.model_path)
+            logger.info("LLMPostProcessor loaded successfully in {} seconds".format(
+                time.time() - start_time))
 
         logger.info(
             "Initializing Prompts for different ID Card faces and formats")
@@ -40,13 +55,16 @@ class IDCardDataExtractor:
         logger.info("IDCardDataExtractor initialized successfully")
 
     def extract(self, image_path, id_card_version: CardVersion, side: CardSide):
-        # orc_results = self.paddle_extractor.extract(image_path)
+        orc_results = self.paddle_extractor.extract(image_path)
+        # print(orc_results.keys())
         ocr_text = " ".join(orc_results["rec_texts"])
+        logger.info(f"Extracted OCR text: {ocr_text}")
+        print(f"Extracted OCR text: {ocr_text}")
         instructions = self.prompts[id_card_version][side].format(
             ocr_text=ocr_text)
-        extracted_data = self.llm_post_processor.execute(instructions)
+        raw_text, extracted_data = self.llm_post_processor.execute(instructions)
 
-        return extracted_data
+        return raw_text, extracted_data
 
     def benchmark_models(self, model_path, orc_data, id_card_version: CardVersion = CardVersion.v2018, side: CardSide = CardSide.RECTO):
         """
@@ -56,7 +74,7 @@ class IDCardDataExtractor:
         instructions = self.prompts[id_card_version][side].format(
             ocr_text=orc_data)
         start_time = time.time()
-        extracted_data = self.llm_post_processor.execute(instructions)
+        _, extracted_data = self.llm_post_processor.execute(instructions)
         elapsed_time = time.time() - start_time
         logger.info(f"Extraction completed in {elapsed_time:.2f} seconds")
 
