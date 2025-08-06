@@ -1,0 +1,21 @@
+# Configuration OCR Service
+model:
+  # Type: "finetune" ou "lora"
+  type: "finetune"
+  
+  # Pour modèle finetune
+  finetune_path: "./models/finetunes/qwen3-0.6b-lora-cni-2018-front"
+  
+  # Pour modèle LoRA (si type = "lora")
+  base_path: "./models/Qwen/Qwen3-0.6B"
+  lora_adapter_path: "./models/finetunes/qwen3-0.6b-cni-lora/checkpoint-938"
+
+server:
+  host: "0.0.0.0"
+  port: 50051
+
+ocr:
+  output_dir: "./ocr_outputs"
+  
+logging:
+  level: "INFO"

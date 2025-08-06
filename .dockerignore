@@ -1,0 +1,41 @@
+# Ignorer les anciens fichiers
+1ld/
+
+# Ignorer les fichiers de développement
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# Ignorer les fichiers de cache et logs
+*.log
+.cache/
+.pytest_cache/
+
+# Ignorer les fichiers IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Ignorer les outputs temporaires
+ocr_outputs/
+uploads/
+
+# Ignorer les fichiers système
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+README.md
+*.md
+
+# Fichiers de test générés
+ocr_pb2.py
+ocr_pb2_grpc.py

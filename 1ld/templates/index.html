@@ -415,6 +415,11 @@
                         <div class="upload-placeholder">
                             <div class="upload-icon">📄</div>
                             <div class="upload-text">Cliquez pour sélectionner une image ou glissez-déposez</div>
+                            <div style="margin-top: 15px;">
+                                <a href="#" id="loadDefaultImage" style="color: #FF7900; text-decoration: none; font-size: 0.9rem;">
+                                    📎 Charger l'image par défaut
+                                </a>
+                            </div>
                         </div>
                         <div class="image-preview" id="imagePreview">
                             <img id="previewImg" src="" alt="Preview">
@@ -548,6 +553,30 @@
         fileInput.addEventListener('change', (e) => {
             if (e.target.files.length > 0) {
                 displaySelectedFile(e.target.files[0]);
+            }
+        });
+
+        // Gestionnaire pour charger l'image par défaut
+        document.getElementById('loadDefaultImage').addEventListener('click', async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            try {
+                const response = await fetch('/static/default_card.jpg');
+                if (!response.ok) throw new Error('Image non trouvée');
+                
+                const blob = await response.blob();
+                const file = new File([blob], 'ID Card Kengali Fegue Pacome_1.jpg', { type: blob.type });
+                
+                // Créer un objet FileList simulé
+                const dt = new DataTransfer();
+                dt.items.add(file);
+                fileInput.files = dt.files;
+                
+                displaySelectedFile(file);
+            } catch (error) {
+                console.error('Erreur lors du chargement de l\'image par défaut:', error);
+                alert('Impossible de charger l\'image par défaut');
             }
         });
 

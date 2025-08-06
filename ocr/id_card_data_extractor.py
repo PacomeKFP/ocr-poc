@@ -54,13 +54,16 @@ class IDCardDataExtractor:
 
         logger.info("IDCardDataExtractor initialized successfully")
 
-    def extract(self, image_path, id_card_version: CardVersion, side: CardSide):
+    def extract(self, image_path, id_card_version: CardVersion, side: CardSide, thinking_mode: bool = False):
         orc_results = self.paddle_extractor.extract(image_path)
         # print(orc_results.keys())
         ocr_text = " ".join(orc_results["rec_texts"])
         logger.info(f"Extracted OCR text: {ocr_text}")
         print(f"Extracted OCR text: {ocr_text}")
-        instructions = self.prompts[id_card_version][side].format(
+        
+        # Select prompt based on thinking mode
+        prompt_key = f"{side.name.lower()}_thinking" if thinking_mode else side
+        instructions = self.prompts[id_card_version][prompt_key].format(
             ocr_text=ocr_text)
         raw_text, extracted_data = self.llm_post_processor.execute(instructions)
 
@@ -89,60 +92,209 @@ class IDCardDataExtractor:
 
         self.prompts = {
             CardVersion.v2018: {
-                CardSide.RECTO: """Extract information from this Cameroonian ID card text and format as JSON:
-                    {ocr_text}
-                    Extract: nom/surname, prenoms/given_names, date_naissance, lieu_naissance, sexe, taille, profession
-                    JSON (only, no explanation, only the json object):""",
+                CardSide.RECTO: """Analyse ce texte OCR d'une carte d'identité camerounaise 2018 (RECTO) et extrait uniquement ces informations :
 
-                CardSide.VERSO: """Extrait les informations de cette carte d'identité camerounaise (verso 2018). Texte OCR:
-                {ocr_text}
+{ocr_text}
 
-                Retourne uniquement un JSON avec ces clés exactes:
-                {{
-                    "pere_father": "nom et prénom du père",
-                    "mere_mother": "nom et prénom de la mère",
-                    "sp_sm": "nombre à 6 chiffres",
-                    "date_of_issue": "JJ.MM.AAAA",
-                    "date_of_expiration": "JJ.MM.AAAA",
-                    "identifiant_unique": 20181234567890123,
-                    "numero_de_carte": 123456789,
-                    "authorité": "nom de l'autorité"
-                }}
+Retourne UNIQUEMENT ce JSON avec ces clés exactes :
+{{
+    "nom_surname": "Nom de famille complet",
+    "prenom_given_name": "Prénom(s) complet(s)", 
+    "date_of_birth": "JJ.MM.AAAA (points comme séparateurs)",
+    "lieu_of_birth": "Ville/lieu de naissance",
+    "sex": "M ou F uniquement",
+    "taille": 1.75 (nombre décimal en mètres, sans unité),
+    "profession": "Profession exacte"
+}}
 
-                JSON uniquement:""",
+JSON uniquement:""",
+
+                "recto_thinking": """<thinking>
+Je dois analyser ce texte OCR d'une carte d'identité camerounaise 2018 (RECTO) et extraire les informations suivantes :
+- nom_surname : Nom de famille complet
+- prenom_given_name : Prénom(s) complet(s)
+- date_of_birth : Format JJ.MM.AAAA avec points
+- lieu_of_birth : Ville/lieu de naissance
+- sex : M ou F uniquement
+- taille : Nombre décimal en mètres, sans unité
+- profession : Profession exacte
+
+Analysons le texte OCR :
+{ocr_text}
+
+Je vais identifier chaque champ et extraire les données correspondantes.
+</thinking>
+
+Analyse ce texte OCR d'une carte d'identité camerounaise 2018 (RECTO) et extrait uniquement ces informations :
+
+{ocr_text}
+
+Retourne UNIQUEMENT ce JSON avec ces clés exactes :
+{{
+    "nom_surname": "Nom de famille complet",
+    "prenom_given_name": "Prénom(s) complet(s)", 
+    "date_of_birth": "JJ.MM.AAAA (points comme séparateurs)",
+    "lieu_of_birth": "Ville/lieu de naissance",
+    "sex": "M ou F uniquement",
+    "taille": 1.75 (nombre décimal en mètres, sans unité),
+    "profession": "Profession exacte"
+}}
+
+JSON uniquement:""",
+
+                CardSide.VERSO: """Analyse ce texte OCR d'une carte d'identité camerounaise 2018 (VERSO) et extrait uniquement ces informations :
+
+{ocr_text}
+
+Retourne UNIQUEMENT ce JSON avec ces clés exactes :
+{{
+    "pere_father": "Nom et prénom complets du père",
+    "mere_mother": "Nom et prénom complets de la mère", 
+    "sp_sm": "123456 (6 chiffres exactement)",
+    "date_of_issue": "JJ.MM.AAAA (points comme séparateurs)",
+    "date_of_expiration": "JJ.MM.AAAA (points comme séparateurs)",
+    "identifiant_unique": 20181234567890123 (17 chiffres commençant par année),
+    "numero_de_carte": 123456789 (9 chiffres, nombre isolé),
+    "authorité": "Martin MBARGA NGUELE ou autre autorité"
+}}
+
+JSON uniquement:""",
+
+                "verso_thinking": """<thinking>
+Je dois analyser ce texte OCR d'une carte d'identité camerounaise 2018 (VERSO) et extraire les informations suivantes :
+- pere_father : Nom et prénom complets du père
+- mere_mother : Nom et prénom complets de la mère
+- sp_sm : 6 chiffres exactement
+- date_of_issue : Format JJ.MM.AAAA avec points
+- date_of_expiration : Format JJ.MM.AAAA avec points
+- identifiant_unique : 17 chiffres commençant par l'année
+- numero_de_carte : 9 chiffres isolés
+- authorité : Généralement Martin MBARGA NGUELE
+
+Analysons le texte OCR :
+{ocr_text}
+
+Je vais identifier chaque champ et extraire les données correspondantes.
+</thinking>
+
+Analyse ce texte OCR d'une carte d'identité camerounaise 2018 (VERSO) et extrait uniquement ces informations :
+
+{ocr_text}
+
+Retourne UNIQUEMENT ce JSON avec ces clés exactes :
+{{
+    "pere_father": "Nom et prénom complets du père",
+    "mere_mother": "Nom et prénom complets de la mère", 
+    "sp_sm": "123456 (6 chiffres exactement)",
+    "date_of_issue": "JJ.MM.AAAA (points comme séparateurs)",
+    "date_of_expiration": "JJ.MM.AAAA (points comme séparateurs)",
+    "identifiant_unique": 20181234567890123 (17 chiffres commençant par année),
+    "numero_de_carte": 123456789 (9 chiffres, nombre isolé),
+    "authorité": "Martin MBARGA NGUELE ou autre autorité"
+}}
+
+JSON uniquement:"""
             },
 
             CardVersion.v2025: {
-                CardSide.RECTO: """Extrait les informations de cette carte d'identité camerounaise (recto 2025). Texte OCR:
-                {ocr_text}
+                CardSide.RECTO: """Analyse ce texte OCR d'une carte d'identité camerounaise 2025 (RECTO) et extrait uniquement ces informations :
 
-                Retourne uniquement un JSON avec ces clés exactes:
-                {{
-                    "numero_de_carte": 123456789,
-                    "nom_surname": "nom et prénom de famille",
-                    "prenom_given_name": "prénom(s)",
-                    "date_of_birth": "JJ.MM.AAAA",
-                    "sex": "M ou F",
-                    "date_of_expiration": "JJ.MM.AAAA"
-                }}
+{ocr_text}
 
-                JSON uniquement:""",
+Retourne UNIQUEMENT ce JSON avec ces clés exactes :
+{{
+    "numero_de_carte": 123456789 (9 chiffres au début du document),
+    "nom_surname": "Nom de famille complet",
+    "prenom_given_name": "Prénom(s) complet(s)",
+    "date_of_birth": "JJ.MM.AAAA (points comme séparateurs)", 
+    "sex": "M ou F uniquement",
+    "date_of_expiration": "JJ.MM.AAAA (points comme séparateurs)"
+}}
 
-                CardSide.VERSO: """Extrait les informations de cette carte d'identité camerounaise (verso 2025). Texte OCR:
-                {ocr_text}
+JSON uniquement:""",
 
-                Retourne uniquement un JSON avec ces clés exactes:
-                {{
-                    "pere_father": "nom et prénom du père",
-                    "mere_mother": "nom et prénom de la mère",
-                    "lieu_of_birth": "lieu de naissance",
-                    "date_of_issue": "JJ.MM.AAAA",
-                    "taille": 1.75,
-                    "profession": "profession",
-                    "identifiant_unique": "AB12345678",
-                    "authorité": "nom de l'autorité"
-                }}
+                "recto_thinking": """<thinking>
+Je dois analyser ce texte OCR d'une carte d'identité camerounaise 2025 (RECTO) et extraire les informations suivantes :
+- numero_de_carte : 9 chiffres au début du document
+- nom_surname : Nom de famille complet
+- prenom_given_name : Prénom(s) complet(s)
+- date_of_birth : Format JJ.MM.AAAA avec points
+- sex : M ou F uniquement
+- date_of_expiration : Format JJ.MM.AAAA avec points
 
-                JSON uniquement:"""
+Analysons le texte OCR :
+{ocr_text}
+
+Je vais identifier chaque champ et extraire les données correspondantes.
+</thinking>
+
+Analyse ce texte OCR d'une carte d'identité camerounaise 2025 (RECTO) et extrait uniquement ces informations :
+
+{ocr_text}
+
+Retourne UNIQUEMENT ce JSON avec ces clés exactes :
+{{
+    "numero_de_carte": 123456789 (9 chiffres au début du document),
+    "nom_surname": "Nom de famille complet",
+    "prenom_given_name": "Prénom(s) complet(s)",
+    "date_of_birth": "JJ.MM.AAAA (points comme séparateurs)", 
+    "sex": "M ou F uniquement",
+    "date_of_expiration": "JJ.MM.AAAA (points comme séparateurs)"
+}}
+
+JSON uniquement:""",
+
+                CardSide.VERSO: """Analyse ce texte OCR d'une carte d'identité camerounaise 2025 (VERSO) et extrait uniquement ces informations :
+
+{ocr_text}
+
+Retourne UNIQUEMENT ce JSON avec ces clés exactes :
+{{
+    "pere_father": "Nom et prénom complets du père",
+    "mere_mother": "Nom et prénom complets de la mère",
+    "lieu_of_birth": "Ville/lieu de naissance", 
+    "date_of_issue": "JJ.MM.AAAA (points comme séparateurs)",
+    "taille": 1.75 (nombre décimal en mètres, sans unité),
+    "profession": "Profession exacte",
+    "identifiant_unique": "AB12345678 (2 lettres + 8 chiffres NIC NUMBER)",
+    "authorité": "Martin MBARGA NGUELE ou autre autorité"
+}}
+
+JSON uniquement:""",
+
+                "verso_thinking": """<thinking>
+Je dois analyser ce texte OCR d'une carte d'identité camerounaise 2025 (VERSO) et extraire les informations suivantes :
+- pere_father : Nom et prénom complets du père
+- mere_mother : Nom et prénom complets de la mère
+- lieu_of_birth : Ville/lieu de naissance
+- date_of_issue : Format JJ.MM.AAAA avec points
+- taille : Nombre décimal en mètres, sans unité
+- profession : Profession exacte
+- identifiant_unique : Format AB12345678 (2 lettres + 8 chiffres)
+- authorité : Généralement Martin MBARGA NGUELE
+
+Analysons le texte OCR :
+{ocr_text}
+
+Je vais identifier chaque champ et extraire les données correspondantes.
+</thinking>
+
+Analyse ce texte OCR d'une carte d'identité camerounaise 2025 (VERSO) et extrait uniquement ces informations :
+
+{ocr_text}
+
+Retourne UNIQUEMENT ce JSON avec ces clés exactes :
+{{
+    "pere_father": "Nom et prénom complets du père",
+    "mere_mother": "Nom et prénom complets de la mère",
+    "lieu_of_birth": "Ville/lieu de naissance", 
+    "date_of_issue": "JJ.MM.AAAA (points comme séparateurs)",
+    "taille": 1.75 (nombre décimal en mètres, sans unité),
+    "profession": "Profession exacte",
+    "identifiant_unique": "AB12345678 (2 lettres + 8 chiffres NIC NUMBER)",
+    "authorité": "Martin MBARGA NGUELE ou autre autorité"
+}}
+
+JSON uniquement:"""
             }
         }

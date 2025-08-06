@@ -1,10 +1,26 @@
-Flask==2.3.3
-torch>=1.13.0
+# Core ML dependencies
+torch>=2.0.0
 transformers>=4.30.0
+peft>=0.16.0
+accelerate>=0.20.0
+safetensors>=0.3.0
+
+# gRPC
+grpcio>=1.50.0
+grpcio-tools>=1.50.0
+
+# OCR
 paddlepaddle>=2.5.0
 paddleocr>=2.7.0
+
+# Image processing
+opencv-python>=4.8.0
 Pillow>=9.0.0
-accelerate>=0.20.0
+
+# Utilities
+numpy>=1.24.0
+PyYAML>=6.0
+protobuf>=3.20.0
+
+# Quantization (optional)
 bitsandbytes>=0.39.0
-peft>=0.16.0
-safetensors>=0.3.0

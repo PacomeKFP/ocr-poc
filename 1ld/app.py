@@ -31,7 +31,8 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp'}
 
 # Configuration des modèles (correction du chemin)
-BASE_MODEL_PATH = "./models/finetunes/qwen3-0.6b-lora-cni-2018-front"  # Chemin corrigé
+FINETUNE_MODEL_PATH = "./models/finetunes/qwen3-0.6b-lora-cni-2018-front"
+BASE_MODEL_PATH = "./models/Qwen/Qwen3-0.6B"  # Chemin corrigé  # Chemin corrigé
 LORA_ADAPTER_PATH = "./models/finetunes/qwen3-0.6b-cni-lora/checkpoint-938"
 
 # Choix du modèle : "base" ou "lora"
@@ -53,7 +54,7 @@ def init_extractor():
             logger.info("IDCardDataExtractor with LoRA initialized successfully at startup")
         else:
             logger.info("Initializing IDCardDataExtractor with base model at startup...")
-            extractor = IDCardDataExtractor(BASE_MODEL_PATH)
+            extractor = IDCardDataExtractor(FINETUNE_MODEL_PATH)
             logger.info("IDCardDataExtractor with base model initialized successfully at startup")
     return extractor
 
@@ -62,6 +63,11 @@ def init_extractor():
 @app.route('/')
 def index():
     return render_template('index.html')
+
+@app.route('/data/<filename>')
+def serve_data_file(filename):
+    """Servir les fichiers du dossier data"""
+    return app.send_static_file(f'../data/{filename}')
 
 @app.route('/test', methods=['GET'])
 def test_extractor():

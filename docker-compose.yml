@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  ocr-service:
+    build: .
+    ports:
+      - "50051:50051"
+    volumes:
+      - ./models:/app/models:ro  # Mount models as read-only
+      - ./data:/app/data:ro      # Mount test data as read-only
+      - ./ocr_outputs:/app/ocr_outputs  # Mount output directory
+      - ./config.yaml:/app/config.yaml:ro  # Mount config as read-only
+    environment:
+      - PYTHONPATH=/app
+      - MODEL_CACHE_DIR=/app/models
+    deploy:
+      resources:
+        limits:
+          memory: 8G  # Adjust based on your model size
+        reservations:
+          memory: 4G
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import grpc; import ocr_pb2_grpc; channel = grpc.insecure_channel(\"localhost:50051\"); stub = ocr_pb2_grpc.OCRServiceStub(channel); print(\"OK\")'"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
