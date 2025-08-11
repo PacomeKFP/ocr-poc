@@ -7,3 +7,6 @@ output/
 0ld/
 1ld/
 ocr_outputs/
+.claude
+ocr_outputs/
+data/
