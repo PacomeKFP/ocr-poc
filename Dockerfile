@@ -30,10 +30,11 @@ RUN mkdir -p /app/ocr_outputs
 
 # Expose gRPC port
 EXPOSE 50051
+EXPOSE 5000
 
 # Set environment variables
 ENV PYTHONPATH=/app
 ENV MODEL_CACHE_DIR=/app/models
 
 # Start the gRPC server
-CMD ["python", "ocr_server.py"]
+CMD ["python", "start_services.py"]

@@ -5,8 +5,9 @@ services:
     build: .
     ports:
       - "50051:50051"
+      - "5000:5000"
     volumes:
-      - ./models:/app/models:ro  # Mount models as read-only
+      # - ./models:/app/models:ro  # Mount models as read-only
       - ./data:/app/data:ro      # Mount test data as read-only
       - ./ocr_outputs:/app/ocr_outputs  # Mount output directory
       - ./config.yaml:/app/config.yaml:ro  # Mount config as read-only

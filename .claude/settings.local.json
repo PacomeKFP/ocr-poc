@@ -5,7 +5,8 @@
       "Bash(mkdir:*)",
       "Bash(cp:*)",
       "Bash(mv:*)",
-      "Bash(true)"
+      "Bash(true)",
+      "Bash(python:*)"
     ],
     "deny": []
   }

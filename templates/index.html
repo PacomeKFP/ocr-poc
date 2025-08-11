@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OCR Pro - Extraction de données</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'SF Pro Display', Arial, sans-serif;
+            font-weight: 300;
+            line-height: 1.4;
+            color: #1d1d1f;
+            background: #f5f5f7;
+            min-height: 100vh;
+            padding: 0;
+            margin: 0;
+        }
+
+        .container {
+            max-width: 980px;
+            margin: 40px auto;
+            background: #ffffff;
+            border-radius: 18px;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+            overflow: hidden;
+            border: 0.5px solid rgba(0, 0, 0, 0.04);
+        }
+
+        .header {
+            background: #ffffff;
+            text-align: center;
+            padding: 60px 40px 40px;
+            border-bottom: 0.5px solid rgba(0, 0, 0, 0.08);
+        }
+
+        .header h1 {
+            font-size: 48px;
+            font-weight: 600;
+            color: #1d1d1f;
+            margin-bottom: 8px;
+            letter-spacing: -0.03em;
+        }
+
+        .header p {
+            color: #86868b;
+            font-size: 21px;
+            font-weight: 400;
+            line-height: 1.38;
+        }
+
+        .form-section {
+            padding: 40px 60px 60px;
+        }
+
+        .form-group {
+            margin-bottom: 32px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 12px;
+            font-weight: 500;
+            color: #1d1d1f;
+            font-size: 17px;
+            letter-spacing: -0.022em;
+        }
+
+        input[type="file"] {
+            width: 100%;
+            padding: 24px;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            border-radius: 12px;
+            background: #fbfbfd;
+            transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            cursor: pointer;
+            font-size: 17px;
+            color: #1d1d1f;
+        }
+
+        input[type="file"]:hover {
+            border-color: #ff6600;
+            background: #ffffff;
+            box-shadow: 0 2px 12px rgba(255, 102, 0, 0.15);
+        }
+
+        .options-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+
+        select {
+            width: 100%;
+            padding: 16px 12px;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+            font-size: 17px;
+            background: #fbfbfd;
+            color: #1d1d1f;
+            transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            font-family: inherit;
+            -webkit-appearance: none;
+            appearance: none;
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="8" viewBox="0 0 12 8"><path fill="%23666" d="M6 8L0 0h12z"/></svg>');
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: #ff6600;
+            background: #ffffff;
+            box-shadow: 0 0 0 3px rgba(255, 102, 0, 0.1);
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            margin-top: 8px;
+        }
+
+        input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            accent-color: #ff6600;
+            margin-top: 2px;
+        }
+
+        .checkbox-group label {
+            margin-bottom: 0;
+            font-size: 15px;
+            color: #86868b;
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 18px 24px;
+            background: #ff6600;
+            color: #ffffff;
+            border: none;
+            border-radius: 12px;
+            font-size: 17px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            letter-spacing: -0.022em;
+            font-family: inherit;
+        }
+
+        .submit-btn:hover:not(:disabled) {
+            background: #e55a00;
+            transform: translateY(-1px);
+            box-shadow: 0 8px 24px rgba(255, 102, 0, 0.25);
+        }
+
+        .submit-btn:active:not(:disabled) {
+            transform: translateY(0);
+            box-shadow: 0 2px 8px rgba(255, 102, 0, 0.2);
+        }
+
+        .submit-btn:disabled {
+            background: #d2d2d7;
+            color: #86868b;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        /* Indicateur de chargement - Style Apple */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            display: none;
+            z-index: 10000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .loading-content {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            padding: 48px 40px;
+            border-radius: 20px;
+            text-align: center;
+            max-width: 420px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+            border: 0.5px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .spinner {
+            width: 44px;
+            height: 44px;
+            border: 2px solid rgba(255, 102, 0, 0.2);
+            border-top: 2px solid #ff6600;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 24px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            font-size: 19px;
+            font-weight: 500;
+            color: #1d1d1f;
+            margin-bottom: 8px;
+            letter-spacing: -0.022em;
+        }
+
+        .loading-subtext {
+            color: #86868b;
+            font-size: 15px;
+            line-height: 1.4;
+            font-weight: 400;
+        }
+
+        .loading-progress {
+            margin-top: 20px;
+            text-align: left;
+        }
+
+        .progress-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 14px;
+            color: #86868b;
+            transition: color 0.3s ease;
+        }
+
+        .progress-item.active {
+            color: #ff6600;
+        }
+
+        .progress-item.completed {
+            color: #34c759;
+        }
+
+        .progress-icon {
+            width: 16px;
+            height: 16px;
+            margin-right: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .results-section {
+            display: none;
+            padding: 40px 60px 60px;
+            background: #fbfbfd;
+            border-top: 0.5px solid rgba(0, 0, 0, 0.08);
+        }
+
+        .results-title {
+            font-size: 28px;
+            font-weight: 600;
+            margin-bottom: 24px;
+            color: #1d1d1f;
+            letter-spacing: -0.03em;
+        }
+
+        .result-card {
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+            border: 0.5px solid rgba(0, 0, 0, 0.04);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+        }
+
+        .result-card h3 {
+            color: #1d1d1f;
+            margin-bottom: 16px;
+            font-size: 19px;
+            font-weight: 500;
+            letter-spacing: -0.022em;
+        }
+
+        .json-data {
+            background: #1d1d1f;
+            color: #f5f5f7;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+            white-space: pre-wrap;
+            overflow-x: auto;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .error-message {
+            background: #ff3b30;
+            color: white;
+            padding: 16px 20px;
+            border-radius: 12px;
+            margin-top: 24px;
+            font-size: 15px;
+            font-weight: 500;
+        }
+
+        .success-message {
+            background: #34c759;
+            color: white;
+            padding: 16px 20px;
+            border-radius: 12px;
+            margin-top: 24px;
+            font-size: 15px;
+            font-weight: 500;
+        }
+
+        .warning-message {
+            background: #ff9500;
+            color: white;
+            padding: 16px 20px;
+            border-radius: 12px;
+            margin-top: 24px;
+            font-size: 15px;
+            font-weight: 500;
+        }
+
+        .retry-button {
+            background: #ff6600;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            margin-left: 12px;
+            transition: background 0.2s ease;
+        }
+
+        .retry-button:hover {
+            background: #e55a00;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 16px;
+            font-size: 12px;
+            font-weight: 500;
+            margin-left: 8px;
+        }
+
+        .status-healthy {
+            background: rgba(52, 199, 89, 0.1);
+            color: #34c759;
+        }
+
+        .status-warning {
+            background: rgba(255, 149, 0, 0.1);
+            color: #ff9500;
+        }
+
+        .status-error {
+            background: rgba(255, 59, 48, 0.1);
+            color: #ff3b30;
+        }
+
+        @media (max-width: 768px) {
+            body {
+                background: #ffffff;
+            }
+            
+            .container {
+                margin: 0;
+                border-radius: 0;
+                box-shadow: none;
+                border: none;
+            }
+            
+            .options-row {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+            
+            .header {
+                padding: 40px 20px 30px;
+            }
+            
+            .header h1 {
+                font-size: 34px;
+            }
+            
+            .header p {
+                font-size: 19px;
+            }
+            
+            .form-section, .results-section {
+                padding: 30px 20px;
+            }
+            
+            .loading-content {
+                margin: 20px;
+                padding: 36px 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Overlay de chargement - Style Apple -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-content">
+            <div class="spinner"></div>
+            <div class="loading-text">Analyse en cours</div>
+            <div class="loading-subtext">
+                L'intelligence artificielle traite votre document.<br>
+                Cette opération peut prendre quelques instants.
+            </div>
+            <div class="loading-progress" id="loadingProgress">
+                <div class="progress-item" id="step1">
+                    <span class="progress-icon">1.</span>
+                    <span>Préparation du document</span>
+                </div>
+                <div class="progress-item" id="step2">
+                    <span class="progress-icon">2.</span>
+                    <span>Reconnaissance optique</span>
+                </div>
+                <div class="progress-item" id="step3">
+                    <span class="progress-icon">3.</span>
+                    <span>Analyse intelligente</span>
+                </div>
+                <div class="progress-item" id="step4">
+                    <span class="progress-icon">4.</span>
+                    <span>Structuration des données</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="header">
+            <h1>OCR Pro</h1>
+            <p>Intelligence artificielle pour l'extraction de données</p>
+            <div id="statusIndicator"></div>
+        </div>
+
+        <div class="form-section">
+            <form id="ocrForm" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label for="imageFile">Document à analyser</label>
+                    <input type="file" id="imageFile" name="image" accept="image/*" required>
+                </div>
+
+                <div class="options-row">
+                    <div class="form-group">
+                        <label for="version">Version du document</label>
+                        <select id="version" name="version" required>
+                            <option value="2018" selected>2018</option>
+                            <option value="2025">2025</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="side">Face du document</label>
+                        <select id="side" name="side" required>
+                            <option value="recto" selected>Recto</option>
+                            <option value="verso">Verso</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Options avancées</label>
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="thinkingMode" name="thinking_mode" value="true">
+                            <label for="thinkingMode">Mode haute précision</label>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="submit-btn" id="submitBtn">
+                    Analyser le document
+                </button>
+            </form>
+        </div>
+
+        <div id="resultsSection" class="results-section">
+            <h2 class="results-title">Résultats</h2>
+            
+            <div class="result-card">
+                <h3>Texte extrait</h3>
+                <div id="rawText" class="json-data"></div>
+            </div>
+
+            <div class="result-card">
+                <h3>Données structurées</h3>
+                <div id="extractedData" class="json-data"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let progressInterval;
+        
+        document.getElementById('ocrForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData();
+            const imageFile = document.getElementById('imageFile').files[0];
+            
+            if (!imageFile) {
+                showMessage('Veuillez sélectionner une image', 'error');
+                return;
+            }
+
+            // Préparer les données
+            formData.append('image', imageFile);
+            formData.append('version', document.getElementById('version').value);
+            formData.append('side', document.getElementById('side').value);
+            formData.append('thinking_mode', document.getElementById('thinkingMode').checked);
+
+            // Afficher l'overlay de chargement avec progression
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            const submitBtn = document.getElementById('submitBtn');
+            const resultsSection = document.getElementById('resultsSection');
+            
+            loadingOverlay.style.display = 'flex';
+            submitBtn.disabled = true;
+            resultsSection.style.display = 'none';
+            
+            // Simuler la progression
+            startProgressSimulation();
+
+            try {
+                const response = await fetch('/api/extract', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    // Afficher les résultats
+                    document.getElementById('rawText').textContent = result.raw_text || 'Aucun texte extrait';
+                    document.getElementById('extractedData').textContent = JSON.stringify(result.extracted_data, null, 2);
+                    
+                    resultsSection.style.display = 'block';
+                    
+                    // Message de succès avec métriques
+                    let successMsg = 'Extraction réussie !';
+                    if (result.meta) {
+                        const time = result.meta.processing_time;
+                        const retries = result.meta.retry_count;
+                        successMsg += ` (${time?.toFixed(1) || 0}s${retries > 0 ? `, ${retries} retry` : ''})`;
+                    }
+                    showMessage(successMsg, 'success');
+                } else {
+                    // Gestion d'erreurs améliorée
+                    let errorMsg = result.error || 'Erreur inconnue';
+                    let messageType = 'error';
+                    
+                    if (result.error_code === 'SERVICE_UNAVAILABLE') {
+                        errorMsg += ' Le service sera automatiquement relancé.';
+                        messageType = 'warning';
+                    } else if (result.error_code === 'TEMPORARY_ERROR' && result.meta?.can_retry) {
+                        errorMsg += ' Veuillez réessayer dans quelques instants.';
+                        messageType = 'warning';
+                    }
+                    
+                    showMessage(errorMsg, messageType, result.meta?.can_retry);
+                }
+                
+            } catch (error) {
+                console.error('Erreur:', error);
+                showMessage('Erreur de connexion : ' + error.message, 'error');
+            } finally {
+                // Masquer l'overlay de chargement
+                clearInterval(progressInterval);
+                loadingOverlay.style.display = 'none';
+                submitBtn.disabled = false;
+                resetProgress();
+            }
+        });
+
+        function startProgressSimulation() {
+            const steps = ['step1', 'step2', 'step3', 'step4'];
+            let currentStep = 0;
+            
+            // Activer le premier step
+            document.getElementById(steps[0]).classList.add('active');
+            
+            progressInterval = setInterval(() => {
+                if (currentStep < steps.length) {
+                    // Marquer comme terminé
+                    document.getElementById(steps[currentStep]).classList.remove('active');
+                    document.getElementById(steps[currentStep]).classList.add('completed');
+                    
+                    currentStep++;
+                    
+                    // Activer le suivant s'il existe
+                    if (currentStep < steps.length) {
+                        document.getElementById(steps[currentStep]).classList.add('active');
+                    }
+                }
+            }, 2000); // Change toutes les 2 secondes
+        }
+        
+        function resetProgress() {
+            const steps = ['step1', 'step2', 'step3', 'step4'];
+            steps.forEach(stepId => {
+                const step = document.getElementById(stepId);
+                step.classList.remove('active', 'completed');
+            });
+        }
+
+        function showMessage(message, type, canRetry = false) {
+            // Supprimer les anciens messages
+            const existingMessages = document.querySelectorAll('.success-message, .error-message, .warning-message');
+            existingMessages.forEach(msg => msg.remove());
+            
+            // Créer le nouveau message
+            const messageDiv = document.createElement('div');
+            let className = 'error-message';
+            if (type === 'success') className = 'success-message';
+            else if (type === 'warning') className = 'warning-message';
+            
+            messageDiv.className = className;
+            messageDiv.innerHTML = message;
+            
+            // Ajouter bouton retry si applicable
+            if (canRetry) {
+                const retryBtn = document.createElement('button');
+                retryBtn.className = 'retry-button';
+                retryBtn.textContent = 'Réessayer';
+                retryBtn.onclick = () => {
+                    document.getElementById('ocrForm').dispatchEvent(new Event('submit'));
+                    messageDiv.remove();
+                };
+                messageDiv.appendChild(retryBtn);
+            }
+            
+            // L'ajouter à la section formulaire
+            const formSection = document.querySelector('.form-section');
+            formSection.appendChild(messageDiv);
+            
+            // Le retirer après 8 secondes
+            setTimeout(() => {
+                if (messageDiv.parentNode) {
+                    messageDiv.remove();
+                }
+            }, 8000);
+        }
+
+        // Vérification de santé de l'API au chargement
+        window.addEventListener('load', async function() {
+            const statusIndicator = document.getElementById('statusIndicator');
+            
+            try {
+                const response = await fetch('/api/health');
+                const health = await response.json();
+                
+                let statusClass = 'status-error';
+                let statusText = 'Service indisponible';
+                
+                if (health.status === 'healthy') {
+                    statusClass = 'status-healthy';
+                    statusText = 'Service opérationnel';
+                } else if (health.status === 'degraded') {
+                    statusClass = 'status-warning';
+                    statusText = 'Service partiellement disponible';
+                }
+                
+                statusIndicator.innerHTML = `<span class="status-indicator ${statusClass}">${statusText}</span>`;
+                
+                if (health.status !== 'healthy') {
+                    showMessage('Certains services peuvent être indisponibles. Vérifiez que le serveur gRPC est démarré.', 'warning');
+                }
+            } catch (error) {
+                statusIndicator.innerHTML = `<span class="status-indicator status-error">Vérification impossible</span>`;
+                showMessage('Impossible de vérifier l\'état des services', 'warning');
+            }
+        });
+    </script>
+</body>
+</html>

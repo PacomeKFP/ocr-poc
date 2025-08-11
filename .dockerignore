@@ -1,5 +1,6 @@
 # Ignorer les anciens fichiers
 1ld/
+0ld
 
 # Ignorer les fichiers de développement
 __pycache__/
@@ -39,3 +40,5 @@ README.md
 # Fichiers de test générés
 ocr_pb2.py
 ocr_pb2_grpc.py
+models/
+logs/

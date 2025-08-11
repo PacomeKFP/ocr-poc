@@ -28,18 +28,7 @@ class OCRServiceImpl(ocr_service_pb2_grpc.OCRServiceServicer):
         with open(config_path, 'r') as f:
             self.config = yaml.safe_load(f)
         
-        # Initialize extractor based on config
-        if self.config['model']['type'] == 'lora':
-            logger.info("Using LoRA model configuration")
-            self.extractor = IDCardDataExtractor(
-                llm_model_path=self.config['model']['base_path'],
-                lora_adapter_path=self.config['model']['lora_adapter_path']
-            )
-        else:
-            logger.info("Using fine-tuned model configuration")
-            self.extractor = IDCardDataExtractor(
-                llm_model_path=self.config['model']['finetune_path']
-            )
+        self.extractor = IDCardDataExtractor()
         
         # Create output directory
         os.makedirs(self.config['ocr']['output_dir'], exist_ok=True)
@@ -65,8 +54,7 @@ class OCRServiceImpl(ocr_service_pb2_grpc.OCRServiceServicer):
                 raw_text, extracted_data = self.extractor.extract(
                     temp_path, 
                     card_version, 
-                    card_side,
-                    thinking_mode=request.thinking_mode
+                    card_side
                 )
                 
                 # Convert extracted_data to JSON string

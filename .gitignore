@@ -4,3 +4,6 @@ cache/
 models/
 output/
 *.log
+0ld/
+1ld/
+ocr_outputs/
