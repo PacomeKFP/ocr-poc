@@ -1,3 +1,10 @@
+# Core ML dependencies
+# torch>=2.0.0
+# transformers>=4.30.0
+# peft>=0.16.0
+# accelerate>=0.20.0
+# safetensors>=0.3.0
+
 # Web API
 Flask>=2.3.0
 
@@ -18,3 +25,5 @@ numpy>=1.24.0
 PyYAML>=6.0
 protobuf>=3.20.0
 
+# Quantization (optional)
+# bitsandbytes>=0.39.0
