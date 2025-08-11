@@ -1,28 +1,36 @@
-# Docker
-# Build a Docker image
-# https://docs.microsoft.com/azure/devops/pipelines/languages/docker
-
 trigger:
 - main
 
-resources:
-- repo: self
+pool:
+  name: Default
 
 variables:
-  tag: '$(Build.BuildId)'
+  imageName: 'nexus.orange.cm:4443/digitalisation/backend-ocr'
+  tag: '$(Build.BuildNumber)'
 
-stages:
-- stage: Build
-  displayName: Build image
-  jobs:
-  - job: Build
-    displayName: Build
-    pool:
-      name: default
-    steps:
-    - task: Docker@2
-      displayName: Build an image
-      inputs:
-        command: 'build'
-        Dockerfile: '**/Dockerfile'
-        tags: '$(tag)'
+steps:
+# Étape 1 : Build de l'image
+- task: Docker@0
+  displayName: 'Build Docker Image'
+  inputs:
+    containerregistrytype: 'Container Registry'
+    dockerRegistryConnection: Nexus   # Nom du service connection vers Nexus
+    buildArguments: 'http_proxy=http://192.168.200.200:3128'
+    dockerFile: '**/Dockerfile'
+    imageName: '$(imageName):$(tag)'
+    includeSourceTags: true
+
+# Étape 2 : Push de l'image
+- task: Docker@1
+  displayName: 'Push Docker Image'
+  inputs:
+    containerregistrytype: 'Container Registry'
+    dockerRegistryEndpoint: Nexus
+    command: 'Push an image'
+    imageName: '$(imageName):$(tag)'
+    includeSourceTags: true
+
+# Étape 3 : Nettoyage image locale
+- script: |
+    docker image rm -f $(imageName):$(tag)
+  displayName: 'Remove Local Image'
