@@ -5,13 +5,13 @@ from difflib import SequenceMatcher
 
 class CNIExtractor25B:
     """
-    Extracteur pour le nouveau format de CNI camerounaise (2025) 
+    Extracteur pour le verso du nouveau format de CNI camerounaise (2025)
     utilisant une approche par élimination avec détection floue des ancres.
     """
 
     def __init__(self, quality_threshold: float = 0.5, similarity_threshold: float = 0.70, debug: bool = True):
         """
-        Initialise l'extracteur pour le nouveau format.
+        Initialise l'extracteur pour le verso du nouveau format.
 
         Args:
             quality_threshold: Seuil minimal de qualité OCR pour procéder
@@ -22,29 +22,27 @@ class CNIExtractor25B:
         self.similarity_threshold = similarity_threshold
         self.debug = debug
 
-        # Ancres possibles pour chaque champ
+        # Ancres possibles pour chaque champ du verso nouveau format
         self.anchors = {
-            'nom': ['NOM', 'SURNAME', 'NOM/SURNAME'],
-            'prenom': ['PRENOMS', 'PRENOM', 'GIVEN NAMES', 'GIVEN NAME', 
-                      'PRENOMS/GIVEN NAMES', 'PRENOMS/GIVEN NAME'],
-            'date_naissance': ['DATE DE NAISSANCE', 'DATE OF BIRTH', 
-                             'DATE DENAISSANCE', 'DATEOF BIRTH',
-                             'DATE DE NAISSANCE/DATE OF BIRTH'],
-            'date_expiration': ['DATE D\'EXPIRATION', 'DATE OF EXPIRY',
-                              'DATED\'EXPIRATION', 'DATEOF EXPIRY',
-                              'DATE D\'EXPIRATION/DATE OF EXPIRY'],
-            'sexe': ['SEXE', 'SEX', 'SEXE/SEX'],
-            'signature': ['SIGNATURE', 'HOLDER\'S SIGNATURE', 
-                         'SIGNATURE/HOLDER\'S SIGNATURE']
+            'pere': ['NOM DU PERE', 'FATHER\'S NAME', 'NOM DU PERE /FATHER\'S NAME',
+                    'PERE', 'FATHER'],
+            'mere': ['NOM DE LA MERE', 'MOTHER\'S NAME', 'NOM DE LA MERE / MOTHER\'S NAME',
+                    'I MOTHER\'S NAME', 'MERE', 'MOTHER'],
+            'lieu_naissance': ['LIEU DE NAISSANCE', 'PLACE OF BIRTH', 
+                              'LIEU DE NAISSANCEIPLACE OF BIRTH',
+                              'LIEU DENAISSANCE', 'PLACEOF BIRTH'],
+            'date_delivrance': ['DATE DE DELIVRANCE', 'DATE OF ISSUE',
+                               'DATE DE DELIVRANCEI', 'DATEOFISSUE'],
+            'taille': ['TAILLE', 'HEIGHT', 'TAILLE/', 'TAILLE/HEIGHT'],
+            'profession': ['PROFESSION', 'OCCUPATION', 'PROFESSION/OCCUPATION'],
+            'numero_cni': ['NUMERO CNI', 'NIC NUMBER', 'NUMERO CNI/NIC NUMBER',
+                          'NUMEROCNI', 'NICNUMBER'],
+            'autorite': ['LEDGSN', 'THE DGNS', 'LEDGSN/THE DGNS', 'AUTORITE', 'AUTHORITY']
         }
 
-        # Labels à ignorer (filigranes et textes de fond)
+        # Labels à ignorer
         self.ignore_words = {
-            'TRAVAIL', 'PATRIE', 'WORK', 'FATHERLAND', 
-            'CMR', 'CAMEROUN', 'CAMEROON',
-            'REPUBLIQUE', 'REPUBLIC', 'DU', 'OF',
-            'CARTE', 'NATIONALE', 'IDENTITE', 
-            'NATIONAL', 'IDENTITY', 'CARD'
+            'CMR', 'CAMEROUN', 'CAMEROON'
         }
 
         # Tous les labels possibles (pour filtrage)
@@ -52,7 +50,6 @@ class CNIExtractor25B:
         for labels in self.anchors.values():
             self.all_labels.update(labels)
         self.all_labels.update(self.ignore_words)
-        self.all_labels.update(['SIGNATURE', 'HOLDER\'S'])
 
     def log(self, message: str, level: str = "INFO"):
         """Affiche un message de log si le mode debug est activé."""
@@ -92,10 +89,10 @@ class CNIExtractor25B:
         self.log(f"Éléments de bonne qualité (>0.7): {good_quality}/{len(scores)}")
         self.log(f"Éléments valides: {len(valid_scores)}")
 
-        # Au moins 6 éléments détectés pour le nouveau format
-        can_proceed = (len(valid_scores) >= 6 and 
+        # Au moins 5 éléments détectés pour le verso
+        can_proceed = (len(valid_scores) >= 5 and 
                       avg_score >= self.quality_threshold and
-                      good_quality >= 4)
+                      good_quality >= 3)
 
         self.log(f"Peut continuer: {can_proceed}")
 
@@ -104,7 +101,7 @@ class CNIExtractor25B:
     def preprocess(self, texts: List[str], scores: List[float],
                   polygons: List) -> List[Tuple[str, float, List]]:
         """
-        Prétraite les données OCR en filtrant le bruit et les filigranes.
+        Prétraite les données OCR en filtrant le bruit.
         """
         self.log("=== PRÉPROCESSING ===")
         processed = []
@@ -121,20 +118,14 @@ class CNIExtractor25B:
                 self.log(f"  Filtré (texte vide): index {i}", "DEBUG")
                 continue
 
-            # Filtrer les caractères non-latins isolés (国, etc.)
-            if len(text) <= 2:
-                if any(ord(c) > 127 for c in text):
-                    self.log(f"  Filtré (caractère non-latin): '{text}'", "DEBUG")
-                    continue
-
-            # Filtrer les mots isolés qui sont des filigranes connus
-            if text.upper() in self.ignore_words:
-                self.log(f"  Filtré (filigrane): '{text}'", "DEBUG")
+            # Filtrer les lignes MRZ (commencent par I< ou contiennent <<< )
+            if text.startswith('I<') or '<<<' in text:
+                self.log(f"  Filtré (ligne MRZ): '{text}'", "DEBUG")
                 continue
 
-            # Filtrer CMR et codes pays de 3 lettres
-            if len(text) == 3 and text.isupper() and text.isalpha():
-                self.log(f"  Filtré (code pays probable): '{text}'", "DEBUG")
+            # Filtrer CMR isolé
+            if text == 'CMR':
+                self.log(f"  Filtré (code pays): '{text}'", "DEBUG")
                 continue
 
             processed.append((text, score, polygon))
@@ -167,67 +158,47 @@ class CNIExtractor25B:
 
     def extract_fixed_format_fields(self, data: List[Tuple[str, float, List]]) -> Dict:
         """
-        Extrait les champs à format fixe (numéro, dates, sexe).
+        Extrait les champs à format fixe (date, taille, numéro CNI).
         """
         self.log("=== EXTRACTION DES CHAMPS À FORMAT FIXE ===")
 
         results = {
-            'numero_carte': None,
-            'date_naissance': None,
-            'date_expiration': None,
-            'sexe': None
+            'date_delivrance': None,
+            'taille': None,
+            'identifiant_unique': None
         }
         indices_to_remove = []
 
         # Patterns de détection
         date_pattern = re.compile(r'^\d{1,2}\.\d{1,2}\.\d{4}$')  # Format avec points
-        numero_pattern = re.compile(r'^\d{9}$')  # Numéro de carte (9 chiffres)
-
-        dates_found = []
+        taille_pattern = re.compile(r'^[12],?\d{2}m?$')  # 1,66m ou 1.66m
+        numero_cni_pattern = re.compile(r'^[A-Z]{2}\d{8,10}$')  # AA01212923
         
         for idx, (text, score, polygon) in enumerate(data):
-            # Numéro de carte (9 chiffres)
-            if not results['numero_carte'] and numero_pattern.match(text):
-                self.log(f"  Numéro de carte trouvé: '{text}' à l'index {idx}")
-                results['numero_carte'] = text
+            # Date de délivrance
+            if not results['date_delivrance'] and date_pattern.match(text):
+                self.log(f"  Date de délivrance trouvée: '{text}' à l'index {idx}")
+                results['date_delivrance'] = text
                 indices_to_remove.append(idx)
                 continue
             
-            # Dates (format avec points)
-            if date_pattern.match(text):
-                dates_found.append((text, idx, polygon))
-                self.log(f"  Date trouvée: '{text}' à l'index {idx}")
+            # Taille (avec ou sans m)
+            if not results['taille'] and taille_pattern.match(text):
+                # Nettoyer la taille (enlever le 'm' si présent)
+                taille = text.replace('m', '').replace('.', ',')
+                self.log(f"  Taille trouvée: '{text}' -> '{taille}' à l'index {idx}")
+                results['taille'] = taille
                 indices_to_remove.append(idx)
                 continue
             
-            # Sexe
-            if not results['sexe'] and text in ['M', 'F']:
-                self.log(f"  Sexe trouvé: '{text}' à l'index {idx}")
-                results['sexe'] = text
+            # Numéro CNI / Identifiant unique
+            if not results['identifiant_unique'] and numero_cni_pattern.match(text):
+                self.log(f"  Identifiant unique trouvé: '{text}' à l'index {idx}")
+                results['identifiant_unique'] = text
                 indices_to_remove.append(idx)
                 continue
 
-        # Distinguer les dates par leur année
-        for date_text, idx, polygon in dates_found:
-            year = int(date_text.split('.')[-1])
-            
-            # Date de naissance : année < 2010 généralement
-            if not results['date_naissance'] and year < 2010:
-                results['date_naissance'] = date_text
-                self.log(f"  Date de naissance identifiée: {date_text} (année {year})")
-            
-            # Date d'expiration : année > 2020 généralement
-            elif not results['date_expiration'] and year > 2020:
-                results['date_expiration'] = date_text
-                self.log(f"  Date d'expiration identifiée: {date_text} (année {year})")
-
-        # Si on n'a pas pu distinguer par l'année, prendre par ordre
-        if not results['date_naissance'] and dates_found:
-            results['date_naissance'] = dates_found[0][0]
-        if not results['date_expiration'] and len(dates_found) > 1:
-            results['date_expiration'] = dates_found[1][0]
-
-        self.log(f"Champs fixes extraits: {len([v for v in results.values() if v])} sur 4")
+        self.log(f"Champs fixes extraits: {len([v for v in results.values() if v])} sur 3")
         self.log(f"Indices à retirer: {indices_to_remove}")
 
         results['indices_removed'] = indices_to_remove
@@ -269,14 +240,16 @@ class CNIExtractor25B:
         """
         text_upper = text.upper()
 
-        # Vérifier si c'est un mot isolé de filigrane
+        # Vérifier si c'est un mot ignoré
         if text_upper in self.ignore_words:
-            self.log(f"    '{text}' identifié comme filigrane", "DEBUG")
+            self.log(f"    '{text}' identifié comme mot ignoré", "DEBUG")
             return True
 
         # Vérifier si c'est un format bilingue avec /
-        if '/' in text and any(word in text_upper for word in ['NOM', 'SURNAME', 'PRENOM', 'GIVEN', 
-                                                                'DATE', 'SEXE', 'SEX', 'SIGNATURE']):
+        if '/' in text and any(word in text_upper for word in ['NOM', 'NAME', 'MERE', 'MOTHER', 
+                                                                'PERE', 'FATHER', 'DATE', 'LIEU', 
+                                                                'PLACE', 'TAILLE', 'HEIGHT',
+                                                                'PROFESSION', 'OCCUPATION']):
             self.log(f"    '{text}' identifié comme label (format bilingue avec /)", "DEBUG")
             return True
 
@@ -287,10 +260,12 @@ class CNIExtractor25B:
                 self.log(f"    '{text}' identifié comme label (similaire à '{label}', score={sim:.2f})", "DEBUG")
                 return True
 
-        # Mots-clés spécifiques
-        label_words = ['NOM', 'SURNAME', 'PRENOMS', 'PRENOM', 'GIVEN', 'NAMES', 'NAME',
-                      'DATE', 'NAISSANCE', 'BIRTH', 'EXPIRATION', 'EXPIRY',
-                      'SEXE', 'SEX', 'SIGNATURE', 'HOLDER\'S']
+        # Mots-clés spécifiques au verso
+        label_words = ['NOM', 'NAME', 'PERE', 'FATHER', 'MERE', 'MOTHER',
+                      'DATE', 'DELIVRANCE', 'ISSUE', 'LIEU', 'NAISSANCE', 
+                      'PLACE', 'BIRTH', 'TAILLE', 'HEIGHT', 'PROFESSION',
+                      'OCCUPATION', 'NUMERO', 'CNI', 'NIC', 'NUMBER',
+                      'LEDGSN', 'DGNS', 'THE']
 
         words = text_upper.split()
         if len(words) > 1:
@@ -331,10 +306,11 @@ class CNIExtractor25B:
             distance = ((value_center[0] - anchor_center[0])**2 + 
                        (value_center[1] - anchor_center[1])**2) ** 0.5
 
-            # Position relative
+            # Position relative (adapté pour l'orientation verticale du verso)
             is_right = value_center[0] > anchor_center[0]
             is_below = value_center[1] > anchor_center[1]
 
+            # Pour le verso, les valeurs sont souvent à côté ou en dessous
             if is_right or is_below:
                 proximity_score = 1 / (1 + distance/100)
                 candidates.append({
@@ -358,21 +334,25 @@ class CNIExtractor25B:
         return (sum(x_coords) / len(x_coords), sum(y_coords) / len(y_coords))
 
     def extract_remaining_fields(self, data: List[Tuple[str, float, List]], 
-                                anchors: Dict[str, List[Tuple[int, str, float]]]) -> Dict:
+                                anchors: Dict[str, List[Tuple[int, str, float]]],
+                                fixed_fields: Dict) -> Dict:
         """
-        Extrait les champs restants (nom, prénom).
+        Extrait les champs restants (père, mère, lieu de naissance, profession, autorité).
         """
         self.log("=== EXTRACTION DES CHAMPS RESTANTS ===")
 
         results = {
-            'nom': None,
-            'prenom': None
+            'pere': None,
+            'mere': None,
+            'lieu_naissance': None,
+            'profession': None,
+            'autorite': None
         }
 
         used_values = set()
 
         # Extraction par ancres
-        for field in ['nom', 'prenom']:
+        for field in ['pere', 'mere', 'lieu_naissance', 'profession']:
             if anchors.get(field, []):
                 best_anchor = max(anchors[field], key=lambda x: x[2])
                 anchor_idx = best_anchor[0]
@@ -385,46 +365,65 @@ class CNIExtractor25B:
                     used_values.add(value)
                     self.log(f"  '{field}' = '{value}' (extrait par ancre)")
 
-        # Si les champs manquent, chercher les textes restants valides
-        if not results['nom'] or not results['prenom']:
+        # Pour l'autorité, chercher Martin MBARGA NGUELE ou un nom similaire
+        if not results['autorite']:
+            for text, score, _ in data:
+                # Pattern pour nom complet avec MBARGA ou NGUELE
+                if score > 0.9 and ('MBARGA' in text.upper() or 'NGUELE' in text.upper()):
+                    if text not in used_values and not self.is_likely_label(text):
+                        results['autorite'] = text
+                        self.log(f"  'autorite' = '{text}' (détection pattern nom d'autorité)")
+                        break
+
+        # Si des champs manquent, chercher dans les textes restants
+        if not all([results['pere'], results['mere'], results['lieu_naissance'], results['profession']]):
             remaining_texts = []
             for text, score, polygon in data:
-                # Vérifier que c'est un nom valide (alphabétique, score élevé)
                 if (text not in used_values and 
                     not self.is_likely_label(text) and
-                    score > 0.9 and
-                    text.isalpha() and
+                    score > 0.85 and
                     len(text) > 2):
                     
-                    y_pos = self.calculate_center(polygon)[1]
                     remaining_texts.append({
                         'text': text,
-                        'score': score,
-                        'y_position': y_pos
+                        'score': score
                     })
-                    self.log(f"  Texte candidat nom/prénom: '{text}' (y={y_pos:.0f}, score={score:.2f})")
+                    self.log(f"  Texte candidat restant: '{text}' (score={score:.2f})")
 
-            # Trier par position verticale
-            remaining_texts.sort(key=lambda x: x['y_position'])
-
-            # Assigner les champs manquants
-            if not results['nom'] and remaining_texts:
-                results['nom'] = remaining_texts[0]['text']
-                self.log(f"  'nom' = '{results['nom']}' (position: premier élément)")
-                remaining_texts.pop(0)
-
-            if not results['prenom'] and remaining_texts:
-                results['prenom'] = remaining_texts[0]['text']
-                self.log(f"  'prenom' = '{results['prenom']}' (position: deuxième élément)")
+            # Assigner les champs manquants par score/logique
+            for item in remaining_texts:
+                text = item['text']
+                
+                # Profession : souvent un mot seul en majuscules
+                if not results['profession'] and text.isupper() and ' ' not in text:
+                    results['profession'] = text
+                    self.log(f"  'profession' = '{text}' (détection pattern)")
+                    continue
+                
+                # Noms de parents : généralement des noms propres
+                if not results['pere'] and text[0].isupper():
+                    results['pere'] = text
+                    self.log(f"  'pere' = '{text}' (détection pattern nom)")
+                    continue
+                    
+                if not results['mere'] and text[0].isupper():
+                    results['mere'] = text
+                    self.log(f"  'mere' = '{text}' (détection pattern nom)")
+                    continue
+                
+                # Lieu de naissance
+                if not results['lieu_naissance']:
+                    results['lieu_naissance'] = text
+                    self.log(f"  'lieu_naissance' = '{text}' (dernier élément)")
 
         return results
 
     def extract(self, ocr_data: Dict) -> Dict[str, any]:
         """
-        Méthode principale d'extraction pour le nouveau format.
+        Méthode principale d'extraction pour le verso du nouveau format.
         """
         self.log("="*50)
-        self.log("DÉBUT DE L'EXTRACTION CNI (FORMAT 2025)")
+        self.log("DÉBUT DE L'EXTRACTION CNI (VERSO FORMAT 2025)")
         self.log("="*50)
 
         # 1. Évaluer la qualité
@@ -462,16 +461,18 @@ class CNIExtractor25B:
         anchors = self.detect_anchors(remaining_data)
 
         # 5. Extraire les champs restants
-        remaining_fields = self.extract_remaining_fields(remaining_data, anchors)
+        remaining_fields = self.extract_remaining_fields(remaining_data, anchors, fixed_fields)
 
-        # 6. Consolider les résultats (gardant les mêmes clés pour la cohérence)
+        # 6. Consolider les résultats (utilisant les mêmes clés que 18B pour cohérence)
         extracted_data = {
-            'numero_carte': fixed_fields['numero_carte'],
-            'nom': remaining_fields['nom'],
-            'prenom': remaining_fields['prenom'],
-            'date_naissance': fixed_fields['date_naissance'],
-            'date_expiration': fixed_fields['date_expiration'],
-            'sexe': fixed_fields['sexe']
+            'pere': remaining_fields['pere'],
+            'mere': remaining_fields['mere'],
+            'date_delivrance': fixed_fields['date_delivrance'],
+            'lieu_naissance': remaining_fields['lieu_naissance'],
+            'taille': fixed_fields['taille'],
+            'profession': remaining_fields['profession'],
+            'identifiant_unique': fixed_fields['identifiant_unique'],
+            'autorite': remaining_fields['autorite']
         }
 
         # Score de confiance
@@ -498,18 +499,18 @@ class CNIExtractor25B:
 if __name__ == "__main__":
     import json
     
-    # Charger les données OCR du nouveau format
+    # Charger les données OCR du verso nouveau format
     with open('paste.txt', 'r') as f:
         ocr_data = json.load(f)
     
-    # Créer l'extracteur pour le nouveau format
-    extractor = CNIExtractor2025F(debug=True)
+    # Créer l'extracteur pour le verso nouveau format
+    extractor = CNIExtractor2025B(debug=True)
     
     # Extraire les informations
     result = extractor.extract(ocr_data)
     
     print("\n" + "="*50)
-    print("RÉSUMÉ DE L'EXTRACTION (FORMAT 2025)")
+    print("RÉSUMÉ DE L'EXTRACTION (VERSO FORMAT 2025)")
     print("="*50)
     
     if result['success']:
