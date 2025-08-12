@@ -5,7 +5,7 @@ pool:
   name: Default
 
 variables:
-  imageName: 'nexus.orange.cm:4443/digitalisation/backend-ocr'
+  imageName: 'nexus.orange.cm:4443/digitalisation/idcard-orc'
   tag: '$(Build.BuildNumber)'
 
 steps:

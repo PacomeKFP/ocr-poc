@@ -420,5 +420,5 @@ if __name__ == '__main__':
     app.start_time = time.time()
     
     logger.info("API Server démarré avec logging détaillé et recovery automatique")
-    
-    app.run(host='0.0.0.0', port=5000, debug=False)  # Debug False en production
+
+    app.run(host='0.0.0.0', port=8080, debug=False)  # Debug False en production

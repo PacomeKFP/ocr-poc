@@ -30,7 +30,7 @@ RUN mkdir -p /app/ocr_outputs
 
 # Expose gRPC port
 EXPOSE 50051
-EXPOSE 5000
+EXPOSE 8080
 
 # Set environment variables
 ENV PYTHONPATH=/app
