@@ -1,94 +1,48 @@
 #!/usr/bin/env python3
 """
-Script de démarrage pour les services OCR
-Lance le serveur gRPC et l'API REST
+Script de démarrage pour le service OCR
+Lance l'API REST avec OCR intégré
 """
 
 import subprocess
 import sys
-import time
 import os
-import signal
-import threading
-
-def run_grpc_server():
-    """Lance le serveur gRPC"""
-    print("Démarrage du serveur gRPC...")
-    try:
-        process = subprocess.Popen([sys.executable, "ocr_server.py"], 
-                                 stdout=subprocess.PIPE, 
-                                 stderr=subprocess.STDOUT,
-                                 universal_newlines=True,
-                                 bufsize=1)
-        
-        # Afficher les logs du serveur gRPC
-        for line in process.stdout:
-            print(f"[gRPC] {line.strip()}")
-            
-    except Exception as e:
-        print(f"Erreur lors du démarrage du serveur gRPC: {e}")
-
-def run_api_server():
-    """Lance l'API REST Flask"""
-    print("Démarrage de l'API REST...")
-    try:
-        # Attendre que le serveur gRPC soit prêt
-        time.sleep(5)
-        
-        process = subprocess.Popen([sys.executable, "api_server.py"], 
-                                 stdout=subprocess.PIPE, 
-                                 stderr=subprocess.STDOUT,
-                                 universal_newlines=True,
-                                 bufsize=1)
-        
-        # Afficher les logs de l'API REST
-        for line in process.stdout:
-            print(f"[API] {line.strip()}")
-            
-    except Exception as e:
-        print(f"Erreur lors du démarrage de l'API REST: {e}")
 
 def main():
     print("=" * 60)
-    print("SERVICE OCR - CARTE D'IDENTITE CAMEROUNAISE")
+    print("ID CARD OCR - CARTE D'IDENTITÉ CAMEROUNAISE")
     print("=" * 60)
     print()
     
     # Vérifier les fichiers nécessaires
-    required_files = ["ocr_server.py", "api_server.py", "config.yaml"]
+    required_files = ["api_server.py", "config.yaml"]
     for file in required_files:
         if not os.path.exists(file):
             print(f"Fichier manquant: {file}")
             return 1
     
-    print("Tous les fichiers requis sont presents")
+    print("Tous les fichiers requis sont présents")
     print()
     
     try:
-        # Lancer les deux services dans des threads séparés
-        grpc_thread = threading.Thread(target=run_grpc_server, daemon=True)
-        api_thread = threading.Thread(target=run_api_server, daemon=True)
-        
-        grpc_thread.start()
-        api_thread.start()
-        
+        print("Démarrage du service OCR...")
         print()
         print("=" * 60)
-        print("SERVICES DEMARRES AVEC SUCCES !")
+        print("SERVICE DÉMARRÉ AVEC SUCCÈS !")
         print("=" * 60)
-        print("Interface web: http://localhost:5000")
-        print("Serveur gRPC: localhost:50051")
-        print("Sante de l'API: http://localhost:5000/api/health")
+        print("Interface web: http://localhost:8080")
+        print("Santé de l'API: http://localhost:8080/api/health")
+        print("API REST: http://localhost:8080/api/extract")
         print()
-        print("Appuyez sur Ctrl+C pour arreter les services")
+        print("Appuyez sur Ctrl+C pour arrêter le service")
         print("=" * 60)
+        print()
         
-        # Attendre indéfiniment
-        while True:
-            time.sleep(1)
-            
+        # Lancer l'API REST avec Gunicorn
+        subprocess.run(["gunicorn", "--config", "gunicorn.conf.py", "api_server:app"])
+        
     except KeyboardInterrupt:
-        print("\nArret des services...")
+        print("\nArrêt du service...")
         return 0
     except Exception as e:
         print(f"\nErreur: {e}")

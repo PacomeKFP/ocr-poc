@@ -18,23 +18,18 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Generate gRPC files
-COPY ocr_service.proto .
-RUN python -m grpc_tools.protoc --python_out=. --grpc_python_out=. --proto_path=. ocr_service.proto
-
 # Copy application code
 COPY . .
 
 # Create necessary directories
 RUN mkdir -p /app/ocr_outputs
 
-# Expose gRPC port
-EXPOSE 50051
+# Expose API port
 EXPOSE 8080
 
 # Set environment variables
 ENV PYTHONPATH=/app
 ENV MODEL_CACHE_DIR=/app/models
 
-# Start the gRPC server
-CMD ["python", "start_services.py"]
+# Start with Gunicorn
+CMD ["gunicorn", "--config", "gunicorn.conf.py", "api_server:app"]

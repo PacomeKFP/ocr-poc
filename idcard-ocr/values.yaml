@@ -8,7 +8,7 @@ image:
   repository: nexus.orange.cm:4443/digitalisation/idcard-orc
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "20250718.1"
+  tag: "20250812.1"
 
 imagePullSecrets: []
 nameOverride: "idcard-orc"

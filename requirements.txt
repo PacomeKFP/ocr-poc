@@ -7,10 +7,8 @@
 
 # Web API
 Flask>=2.3.0
-
-# gRPC
-grpcio>=1.50.0
-grpcio-tools>=1.50.0
+Werkzeug>=2.3.0
+gunicorn>=21.2.0
 
 # OCR
 paddlepaddle>=2.5.0
@@ -23,7 +21,6 @@ Pillow>=9.0.0
 # Utilities
 numpy>=1.24.0
 PyYAML>=6.0
-protobuf>=3.20.0
 
 # Quantization (optional)
 # bitsandbytes>=0.39.0

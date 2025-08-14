@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
 API REST Flask pour le service OCR
-Sert d'interface entre l'application web et le serveur gRPC
+Interface directe avec le coeur OCR
 """
 
 import os
-import grpc
+import tempfile
 import json
 import logging
 import traceback
@@ -13,15 +13,17 @@ import time
 from datetime import datetime
 from flask import Flask, request, jsonify, render_template
 from werkzeug.utils import secure_filename
-import ocr_service_pb2
-import ocr_service_pb2_grpc
 import uuid
 from functools import wraps
+
+# Import du coeur OCR
+from ocr.id_card_data_extractor import IDCardDataExtractor
+from ocr.card_side import CardSide
+from ocr.card_version import CardVersion
 
 # Configuration
 UPLOAD_FOLDER = 'uploads'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'tiff', 'webp'}
-GRPC_SERVER_HOST = 'localhost:50051'
 
 # Setup logging détaillé
 logging.basicConfig(
@@ -36,7 +38,7 @@ logger = logging.getLogger(__name__)
 
 # Logger spécifique pour les métriques
 metrics_logger = logging.getLogger('metrics')
-metrics_handler = logging.FileHandler('api_metrics.log')
+metrics_handler = logging.FileHandler('api_metrics.log', encoding='utf-8')
 metrics_handler.setFormatter(logging.Formatter('%(asctime)s - %(message)s'))
 metrics_logger.addHandler(metrics_handler)
 metrics_logger.setLevel(logging.INFO)
@@ -96,99 +98,75 @@ def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-def call_grpc_service(request_id, image_data, version, side, thinking_mode=False, retry_count=0):
-    """Appelle le service gRPC pour traiter l'image avec retry automatique"""
-    max_retries = 3
-    retry_delay = [5, 10, 20]  # Délais progressifs
-    
-    logger.info(f"[{request_id}] Tentative {retry_count + 1}/{max_retries + 1} - Connexion au serveur gRPC {GRPC_SERVER_HOST}")
-    logger.info(f"[{request_id}] Paramètres: version={version}, side={side}, thinking_mode={thinking_mode}, taille_image={len(image_data)} bytes")
+# Instance globale de l'extracteur OCR
+ocr_extractor = None
+
+def init_ocr_extractor():
+    """Initialise l'extracteur OCR une seule fois"""
+    global ocr_extractor
+    if ocr_extractor is None:
+        logger.info("Initialisation de l'extracteur OCR...")
+        ocr_extractor = IDCardDataExtractor()
+        logger.info("Extracteur OCR initialisé avec succès")
+
+def process_ocr_request(request_id, image_data, version, side):
+    """Traite une requête OCR avec l'extracteur local"""
+    logger.info(f"[{request_id}] Traitement OCR direct")
+    logger.info(f"[{request_id}] Paramètres: version={version}, side={side}, taille_image={len(image_data)} bytes")
     
     try:
-        # Test de connexion d'abord
-        logger.info(f"[{request_id}] Test de connexion au serveur gRPC...")
-        with grpc.insecure_channel(GRPC_SERVER_HOST) as channel:
-            try:
-                grpc.channel_ready_future(channel).result(timeout=10)
-                logger.info(f"[{request_id}] Connexion gRPC établie avec succès")
-            except grpc.FutureTimeoutError:
-                raise Exception("Timeout lors de la connexion au serveur gRPC")
+        # S'assurer que l'extracteur est initialisé
+        if ocr_extractor is None:
+            init_ocr_extractor()
+        
+        # Sauvegarder l'image temporairement
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as temp_file:
+            temp_file.write(image_data)
+            temp_path = temp_file.name
+        
+        try:
+            # Convertir les paramètres
+            card_version = CardVersion.v2018 if version == '2018' else CardVersion.v2025
+            card_side = CardSide.RECTO if side == 'recto' else CardSide.VERSO
             
-            stub = ocr_service_pb2_grpc.OCRServiceStub(channel)
+            logger.info(f"[{request_id}] Début extraction OCR...")
+            start_time = time.time()
             
-            # Créer la requête
-            logger.info(f"[{request_id}] Création de la requête gRPC...")
-            grpc_request = ocr_service_pb2.OCRRequest(
-                image_data=image_data,
-                version=version,
-                side=side,
-                thinking_mode=thinking_mode
+            # Extraire les données
+            raw_text, extracted_data = ocr_extractor.extract(
+                temp_path, 
+                card_version, 
+                card_side
             )
             
-            # Appeler le service avec timeout étendu
-            logger.info(f"[{request_id}] Envoi de la requête au serveur gRPC (timeout: 300s)...")
-            start_grpc = time.time()
-            
-            response = stub.ExtractData(grpc_request, timeout=300)
-            
-            grpc_time = time.time() - start_grpc
-            logger.info(f"[{request_id}] Réponse reçue du serveur gRPC en {grpc_time:.2f}s")
-            logger.info(f"[{request_id}] Statut de la réponse: success={response.success}")
-            
-            if response.success:
-                logger.info(f"[{request_id}] Extraction réussie - Taille texte brut: {len(response.raw_text)} chars")
-                logger.info(f"[{request_id}] Taille données extraites: {len(response.extracted_data)} chars")
-            else:
-                logger.warning(f"[{request_id}] Extraction échouée - Erreur: {response.error}")
+            processing_time = time.time() - start_time
+            logger.info(f"[{request_id}] Extraction réussie en {processing_time:.2f}s")
+            logger.info(f"[{request_id}] Taille texte brut: {len(raw_text)} chars")
             
             return {
-                'success': response.success,
-                'raw_text': response.raw_text,
-                'extracted_data': json.loads(response.extracted_data) if response.extracted_data else {},
-                'error': response.error,
-                'processing_time': grpc_time,
-                'retry_count': retry_count
+                'success': True,
+                'raw_text': raw_text,
+                'extracted_data': extracted_data if extracted_data else {},
+                'error': '',
+                'processing_time': processing_time
             }
             
-    except grpc.RpcError as e:
-        error_msg = f"Erreur gRPC: {e.code()} - {e.details()}"
-        logger.error(f"[{request_id}] {error_msg}")
-        
-        # Retry automatique pour certaines erreurs
-        if retry_count < max_retries and e.code() in [grpc.StatusCode.UNAVAILABLE, grpc.StatusCode.DEADLINE_EXCEEDED]:
-            delay = retry_delay[min(retry_count, len(retry_delay) - 1)]
-            logger.info(f"[{request_id}] Retry dans {delay}s (tentative {retry_count + 1}/{max_retries})...")
-            time.sleep(delay)
-            return call_grpc_service(request_id, image_data, version, side, thinking_mode, retry_count + 1)
-        
-        return {
-            'success': False,
-            'raw_text': '',
-            'extracted_data': {},
-            'error': error_msg,
-            'retry_count': retry_count,
-            'final_failure': True
-        }
-        
+        finally:
+            # Nettoyer le fichier temporaire
+            if os.path.exists(temp_path):
+                os.unlink(temp_path)
+                
     except Exception as e:
-        error_msg = f"Erreur lors de l'appel gRPC: {str(e)}"
+        error_msg = f"Erreur lors du traitement OCR: {str(e)}"
         logger.error(f"[{request_id}] {error_msg}")
         logger.error(f"[{request_id}] Traceback: {traceback.format_exc()}")
         
-        # Retry pour les erreurs de connexion
-        if retry_count < max_retries and ("connection" in str(e).lower() or "timeout" in str(e).lower()):
-            delay = retry_delay[min(retry_count, len(retry_delay) - 1)]
-            logger.info(f"[{request_id}] Retry dans {delay}s (tentative {retry_count + 1}/{max_retries})...")
-            time.sleep(delay)
-            return call_grpc_service(request_id, image_data, version, side, thinking_mode, retry_count + 1)
-        
         return {
             'success': False,
             'raw_text': '',
             'extracted_data': {},
             'error': error_msg,
-            'retry_count': retry_count,
-            'final_failure': True
+            'processing_time': 0
         }
 
 @app.route('/')
@@ -236,9 +214,8 @@ def extract_data(request_id):
         # Récupérer et valider les paramètres
         version = request.form.get('version', '2018')
         side = request.form.get('side', 'recto')
-        thinking_mode = request.form.get('thinking_mode', 'false').lower() == 'true'
         
-        logger.info(f"[{request_id}] Paramètres: version={version}, side={side}, thinking_mode={thinking_mode}")
+        logger.info(f"[{request_id}] Paramètres: version={version}, side={side}")
         
         if version not in ['2018', '2025']:
             logger.warning(f"[{request_id}] Version invalide: {version}")
@@ -272,9 +249,9 @@ def extract_data(request_id):
         
         logger.info(f"[{request_id}] Fichier lu avec succès: {len(image_data)} bytes")
         
-        # Appeler le service gRPC avec gestion d'erreurs
-        logger.info(f"[{request_id}] Appel du service gRPC...")
-        result = call_grpc_service(request_id, image_data, version, side, thinking_mode)
+        # Traiter avec le coeur OCR
+        logger.info(f"[{request_id}] Traitement OCR direct...")
+        result = process_ocr_request(request_id, image_data, version, side)
         
         # Analyse du résultat
         if result['success']:
@@ -291,27 +268,19 @@ def extract_data(request_id):
             }
             return jsonify(response_data)
         else:
-            # Gestion des erreurs avec codes spécifiques
-            error_code = 'PROCESSING_ERROR'
-            if 'final_failure' in result:
-                error_code = 'SERVICE_UNAVAILABLE' if result['retry_count'] >= 2 else 'TEMPORARY_ERROR'
-            
+            # Gestion des erreurs
             logger.error(f"[{request_id}] Extraction échouée: {result['error']}")
             
             response_data = {
                 'success': False,
                 'error': result['error'],
-                'error_code': error_code,
+                'error_code': 'PROCESSING_ERROR',
                 'meta': {
-                    'retry_count': result.get('retry_count', 0),
-                    'can_retry': result.get('retry_count', 0) < 3,
                     'timestamp': datetime.now().isoformat()
                 }
             }
             
-            # Status code selon le type d'erreur
-            status_code = 503 if error_code == 'SERVICE_UNAVAILABLE' else 500
-            return jsonify(response_data), status_code
+            return jsonify(response_data), 500
             
     except Exception as e:
         logger.error(f"[{request_id}] Erreur critique dans extract_data: {str(e)}")
@@ -333,17 +302,17 @@ def health_check():
     try:
         health_start = time.time()
         
-        # Test de connexion au serveur gRPC
-        grpc_status = 'unknown'
-        grpc_error = None
+        # Test d'initialisation de l'extracteur OCR
+        ocr_status = 'unknown'
+        ocr_error = None
         
         try:
-            with grpc.insecure_channel(GRPC_SERVER_HOST) as channel:
-                grpc.channel_ready_future(channel).result(timeout=5)
-                grpc_status = 'connected'
+            if ocr_extractor is None:
+                init_ocr_extractor()
+            ocr_status = 'ready'
         except Exception as e:
-            grpc_status = 'disconnected'
-            grpc_error = str(e)
+            ocr_status = 'error'
+            ocr_error = str(e)
             
         health_time = time.time() - health_start
         
@@ -352,17 +321,16 @@ def health_check():
         avg_processing_time = (total_processing_time / success_counter) if success_counter > 0 else 0
         
         health_data = {
-            'status': 'healthy' if grpc_status == 'connected' else 'degraded',
+            'status': 'healthy' if ocr_status == 'ready' else 'degraded',
             'timestamp': datetime.now().isoformat(),
             'services': {
                 'api': {
                     'status': 'running',
                     'uptime': time.time() - app.start_time if hasattr(app, 'start_time') else 'unknown'
                 },
-                'grpc_server': {
-                    'status': grpc_status,
-                    'host': GRPC_SERVER_HOST,
-                    'error': grpc_error
+                'ocr_extractor': {
+                    'status': ocr_status,
+                    'error': ocr_error
                 }
             },
             'metrics': {
@@ -378,7 +346,7 @@ def health_check():
             }
         }
         
-        status_code = 200 if grpc_status == 'connected' else 503
+        status_code = 200 if ocr_status == 'ready' else 503
         return jsonify(health_data), status_code
         
     except Exception as e:
@@ -409,16 +377,20 @@ def get_log_file_size():
     except:
         return 'unknown'
 
+# Initialisation au niveau module (pour Gunicorn)
+# Initialiser l'extracteur OCR au démarrage
+init_ocr_extractor()
+
+# Enregistrer le temps de démarrage pour les métriques uptime
+app.start_time = time.time()
+
+logger.info("API Server configuré pour Gunicorn")
+
 if __name__ == '__main__':
-    print(" Démarrage de l'API REST OCR...")
-    print(f" Interface web disponible sur: http://localhost:5000")
-    print(f" Serveur gRPC attendu sur: {GRPC_SERVER_HOST}")
+    # Mode développement - Flask dev server
+    print(" Démarrage de l'API REST OCR (mode développement)...")
+    print(f" Interface web disponible sur: http://localhost:8080")
     print(f" Logs API: api_server.log")
     print(f" Métriques: api_metrics.log")
     
-    # Enregistrer le temps de démarrage pour les métriques uptime
-    app.start_time = time.time()
-    
-    logger.info("API Server démarré avec logging détaillé et recovery automatique")
-
-    app.run(host='0.0.0.0', port=8080, debug=False)  # Debug False en production
+    app.run(host='0.0.0.0', port=8080, debug=True)

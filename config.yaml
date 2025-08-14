@@ -1,4 +1,4 @@
-# Configuration OCR Service
+# Configuration ID Card OCR Service
 model:
   # Type: "finetune" ou "lora"
   type: "finetune"
@@ -10,9 +10,9 @@ model:
   base_path: "./models/Qwen/Qwen3-0.6B"
   lora_adapter_path: "./models/finetunes/qwen3-0.6b-cni-lora/checkpoint-938"
 
-server:
+api:
   host: "0.0.0.0"
-  port: 50051
+  port: 8080
 
 ocr:
   output_dir: "./ocr_outputs"

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OCR Pro - Extraction de données</title>
+    <title>ID Card OCR - Extraction de données</title>
     <style>
         * {
             margin: 0;
@@ -91,7 +91,7 @@
 
         .options-row {
             display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
+            grid-template-columns: 1fr 1fr;
             gap: 24px;
             margin-bottom: 32px;
         }
@@ -424,7 +424,7 @@
             <div class="spinner"></div>
             <div class="loading-text">Analyse en cours</div>
             <div class="loading-subtext">
-                L'intelligence artificielle traite votre document.<br>
+                Traitement de votre document en cours.<br>
                 Cette opération peut prendre quelques instants.
             </div>
             <div class="loading-progress" id="loadingProgress">
@@ -434,15 +434,15 @@
                 </div>
                 <div class="progress-item" id="step2">
                     <span class="progress-icon">2.</span>
-                    <span>Reconnaissance optique</span>
+                    <span>Lecture du document</span>
                 </div>
                 <div class="progress-item" id="step3">
                     <span class="progress-icon">3.</span>
-                    <span>Analyse intelligente</span>
+                    <span>Extraction des données</span>
                 </div>
                 <div class="progress-item" id="step4">
                     <span class="progress-icon">4.</span>
-                    <span>Structuration des données</span>
+                    <span>Finalisation</span>
                 </div>
             </div>
         </div>
@@ -450,15 +450,15 @@
 
     <div class="container">
         <div class="header">
-            <h1>OCR Pro</h1>
-            <p>Intelligence artificielle pour l'extraction de données</p>
+            <h1>ID Card OCR</h1>
+            <p>Extraction de données de cartes d'identité</p>
             <div id="statusIndicator"></div>
         </div>
 
         <div class="form-section">
             <form id="ocrForm" enctype="multipart/form-data">
                 <div class="form-group">
-                    <label for="imageFile">Document à analyser</label>
+                    <label for="imageFile">Carte d'identité</label>
                     <input type="file" id="imageFile" name="image" accept="image/*" required>
                 </div>
 
@@ -479,17 +479,10 @@
                         </select>
                     </div>
 
-                    <div class="form-group">
-                        <label>Options avancées</label>
-                        <div class="checkbox-group">
-                            <input type="checkbox" id="thinkingMode" name="thinking_mode" value="true">
-                            <label for="thinkingMode">Mode haute précision</label>
-                        </div>
-                    </div>
                 </div>
 
                 <button type="submit" class="submit-btn" id="submitBtn">
-                    Analyser le document
+                    Extraire les données
                 </button>
             </form>
         </div>
@@ -498,13 +491,13 @@
             <h2 class="results-title">Résultats</h2>
             
             <div class="result-card">
-                <h3>Texte extrait</h3>
-                <div id="rawText" class="json-data"></div>
+                <h3>Données structurées</h3>
+                <div id="extractedData" class="json-data"></div>
             </div>
 
             <div class="result-card">
-                <h3>Données structurées</h3>
-                <div id="extractedData" class="json-data"></div>
+                <h3>Texte extrait</h3>
+                <div id="rawText" class="json-data"></div>
             </div>
         </div>
     </div>
@@ -527,7 +520,6 @@
             formData.append('image', imageFile);
             formData.append('version', document.getElementById('version').value);
             formData.append('side', document.getElementById('side').value);
-            formData.append('thinking_mode', document.getElementById('thinkingMode').checked);
 
             // Afficher l'overlay de chargement avec progression
             const loadingOverlay = document.getElementById('loadingOverlay');
@@ -683,7 +675,7 @@
                 statusIndicator.innerHTML = `<span class="status-indicator ${statusClass}">${statusText}</span>`;
                 
                 if (health.status !== 'healthy') {
-                    showMessage('Certains services peuvent être indisponibles. Vérifiez que le serveur gRPC est démarré.', 'warning');
+                    showMessage('Certains services peuvent être indisponibles. Vérifiez l’état du service OCR.', 'warning');
                 }
             } catch (error) {
                 statusIndicator.innerHTML = `<span class="status-indicator status-error">Vérification impossible</span>`;
